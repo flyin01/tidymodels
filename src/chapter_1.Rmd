@@ -3,12 +3,12 @@ title: "chapter_1"
 output: html_notebook
 ---
 
-This nb contains code from excersies of Chapter 1.  
+Link: https://supervised-ml-course.netlify.app/  
+This nb contains code from exercises of Chapter 1.  
   
-Load the data.  
-
+Load the data from github: 
 ```{r}
-plot(cars)
+cars2018 <- read.csv("https://raw.githubusercontent.com/juliasilge/supervised-ML-case-studies-course/master/data/cars2018.csv")
 ```
 
-...next
+
