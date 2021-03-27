@@ -1,0 +1,14 @@
+---
+title: "chapter_1"
+output: html_notebook
+---
+
+This nb contains code from excersies of Chapter 1.  
+  
+Load the data.  
+
+```{r}
+plot(cars)
+```
+
+...next
