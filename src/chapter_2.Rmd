@@ -1,0 +1,129 @@
+---
+title: "chapter_2"
+output: html_notebook
+---
+
+Link: https://supervised-ml-course.netlify.app/chapter2  
+github: https://github.com/juliasilge/supervised-ML-case-studies-course  
+stackoverflow source: https://insights.stackoverflow.com/survey  
+This nb contains code from exercises of Chapter 2.  
+  
+This chapter uses a dataset from Stack Overflow Developer Survey. We will start with some EDA then we will train classification models.  
+The specific question we will address is what makes a developer more likely to work remotely. There are characteristics of developers such as size of company, what work they do, experience or where in the world they live that affect how likely they are to be working remotely.  
+
+Load the data from github: 
+```{r}
+stack_overflow <- read.csv("https://raw.githubusercontent.com/juliasilge/supervised-ML-case-studies-course/master/data/stack_overflow.csv")
+```
+
+Load packages
+```{r}
+library(tidyverse)
+```
+
+Immediately we will see that the proportion of developers who are remote and who work in the office is not balanced.
+```{r}
+stack_overflow %>%
+  count(remote)
+```
+This type of class imbalance can have significant negative impact on model performance, we we need to do some preprocessing of the data before we model it.  
+  
+# Explore the Stack Overflow survey
+
+```{r}
+glimpse(stack_overflow)
+
+# Count for remote
+stack_overflow %>%
+  count(remote, sort = TRUE)
+
+# Count for country
+stack_overflow %>%
+  count(country, sort = TRUE)
+```
+
+Make a boxplot with remote status on the x-axis and professional experience on the y-axis.
+```{r}
+stack_overflow %>%
+  ggplot(aes(x = remote, y = years_coded_job)) +
+  geom_boxplot() +
+  labs(x = NULL,
+       y = "Years of professional coding exp")
+```
+We see that the more experience devs have, the more likely they are to work remotely.
+
+# Training and testing data
+
+Before we deal with imbalances in the remote/not remote classes, first we split the data into training and testing sets. We do this to reduce overfitting and to obtain a more accurate estimate for how our model will perform on new data.  
+  
+Instructions:  
+- Create split of 80/20 sections and about evenly divides the sections between different classes of `remote`. Using `initial_split()`, stratify the split by remote status.  
+- Use `training()`to assign the 80% partiction to `stack_train`and use `testing()` to assign the 20% to `stack_test`.  
+```{r}
+# factor remote
+stack_overflow$remote <- factor(stack_overflow$remote)
+str(stack_overflow)
+
+# create stack_select dataset
+stack_select <- stack_overflow %>%
+  select(-respondent)
+
+# split data into training and testing sets
+set.seed(1234)
+stack_split <- stack_select %>%
+  initial_split(prop = 0.8,
+                strata = remote)
+
+stack_train <- training(stack_split)
+stack_test  <- testing(stack_split)
+```
+
+# Dealing with imbalanced data
+
+Class imbalance  
+  
+- is a common problem  
+- often negatively affects the performance of your model  
+
+```{r}
+stack_train %>%
+  count(remote)
+```
+There are about 10 times more non-remote workers than remote workers. What can happen is that a machine learning model will alwas predict the majority class or otherwise exhibt poor performance on the metrics that we care about.  
+  
+There are several ways to deal with this problem, they vary from simple to more complex ways and we will start with a simple option.  
+  
+Down sampling  
+  
+- Remove some of the majority calss to is has less effect on the predictive model  
+- Randomly remove examples from the majority class unitl it is the same size as the minority class.  
+  
+Yes, we throw away a large percentage of our data, becaus it can help us produce a useful model that can recognize both classes instead of just one.  
+  
+We will remove some non-remote devs.We can preprocess your data using recipes. The recipe shown in this slide only has one preprocessing step (downsampling, that comes from an extra add-on package called themis), but you can implement many steps on one dataset during preprocessing. There are an enormous number of different kinds of preprocessing you can do, from creating indicator variables to implementing principal component analysis to extracting date features and more.  
+  
+```{r}
+library(themis)
+
+stack_recipe <- recipe(remote ~ ., data = stack_train) %>%
+  step_downsample(remote)
+```
+Implementing downsampling
+
+```{r}
+stack_prep <- prep(stack_recipe)
+
+bake(stack_prep, new_data = NULL)
+```
+
+
+When you `prep()` a recipe, you estimate the required parameters from a data set for the preprocessing steps in that recipe (as an example, think about finding the mean and standard deviation if you are centering and scaling).
+
+When you `bake()` a prepped recipe with new_data = NULL, you get the preprocessed data back out.
+
+You don't typically need to `prep()` and `bake()` recipes when you use tidymodels, but they are helpful functions to have in your toolkit for confirming that recipes are doing what you expect.
+
+# Preprocess with receipe 
+  
+Jatka tästä  
+https://supervised-ml-course.netlify.app/chapter2
