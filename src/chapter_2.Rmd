@@ -98,12 +98,12 @@ There are several ways to deal with this problem, they vary from simple to more 
   
 Down sampling  
   
-- Remove some of the majority calss to is has less effect on the predictive model  
-- Randomly remove examples from the majority class unitl it is the same size as the minority class.  
+- Remove some of the majority class so it has less effect on the predictive model  
+- Randomly remove examples from the majority class until it is the same size as the minority class.  
   
-Yes, we throw away a large percentage of our data, becaus it can help us produce a useful model that can recognize both classes instead of just one.  
+Yes, we throw away a large percentage of our data, because it can help us produce a useful model that can recognize both classes instead of just one.  
   
-We will remove some non-remote devs.We can preprocess your data using recipes. The recipe shown in this slide only has one preprocessing step (downsampling, that comes from an extra add-on package called themis), but you can implement many steps on one dataset during preprocessing. There are an enormous number of different kinds of preprocessing you can do, from creating indicator variables to implementing principal component analysis to extracting date features and more.  
+We will remove some non-remote devs. We can preprocess your data using recipes. The recipe shown in this slide only has one preprocessing step (downsampling, that comes from an extra add-on package called themis), but you can implement many steps on one dataset during preprocessing. There are an enormous number of different kinds of preprocessing you can do, from creating indicator variables to implementing principal component analysis to extracting date features and more.  
   
 ```{r}
 library(themis)
@@ -126,7 +126,168 @@ When you `bake()` a prepped recipe with new_data = NULL, you get the preprocesse
 
 You don't typically need to `prep()` and `bake()` recipes when you use tidymodels, but they are helpful functions to have in your toolkit for confirming that recipes are doing what you expect.
 
-# Preprocess with receipe 
+# Preprocess with receipe  
+
+There are multiple ways to deal with class imbalances. Just like in above example we will implement downsampling usig the `step_downsample()` function from `themis` package.  
   
-Jatka tästä  
-https://supervised-ml-course.netlify.app/chapter2
+Instructions:  
+- Use `recipe()` to preprocess training data
+- Downsample the data with respect to the remote status of the devs.  
+```{r}
+stack_recipe <- recipe(remote ~ ., data = stack_train) %>%
+  step_downsample(remote)
+
+stack_recipe
+```
+# Downsampling  
+
+Once your recipe is defined, you can estimate the parameters required to actually preprocess the data, and then extract the processed data. This typically isn’t necessary is you use a `workflow()` for modeling, but it can be helpful to diagnose problems or explore your preprocessing results.
+
+Instrucitons
+- First `prep()` the recipe  
+- Then `bake()` the prepped recipe with `new_data = NULL` to see the processed training data.  
+```{r}
+stack_prep <- prep(stack_recipe)
+stack_down <- bake(stack_prep, new_data = NULL)
+
+stack_down %>%
+  count(remote)
+```
+When you `bake()` the prepped recipe stack_prep with new_data = NULL, you extract the processed (i.e. balanced) training data.  
+  
+Understanding downsampling.  
+Downsampling removes from the majority class until the class distributions are equal, so there are the same number of remote and non-remote developers after downsampling. We downsampled the training data. This will help us train a model that performs better.
+    
+Now you have a data set with balanced classes, ready for machine learning!  
+  
+# Predicting remote status  
+  
+Build supervised machine learning models to predict which devs work remotely and which do not.  
+  
+# Train models  
+  
+We will specify our ml models using `parsnip` and use workflows for convenience. https://workflows.tidymodels.org/  
+  
+Instruction:  
+- Specify logistic regression model using logistic_reg()  
+- Build a `workflow()` to hold the modeling components  
+- Add the model specification to the `workflow()` before fitting.  
+
+```{r}
+# downsample as we did above
+stack_recipe <- recipe(remote ~ ., data = stack_train) %>%
+  step_downsample(remote)
+
+# build a logistic regression model
+glm_spec <- logistic_reg() %>%
+  set_engine("glm")
+
+# start a workflow (only recipe)
+stack_wf <- workflow() %>%
+  add_recipe(stack_recipe)
+
+# add the model and fit the workflow
+stack_glm <- stack_wf %>%
+  add_model(glm_spec) %>%
+  fit(data = stack_train)
+
+# print the fitted model
+stack_glm
+```
+  
+Instructions:  
+  
+Build a decision tree model with downsampling.  
+  
+- Specify a decition tree regression model using `decision_tree()`  
+- Add you recipe `stack_recipe` to you `workflow()` 
+- Fit you workflow, after you have added your model to it.  
+  
+```{r}
+# downsample as we did above
+stack_recipe <- recipe(remote ~ ., data = stack_train) %>%
+  step_downsample(remote)
+
+# build a decision tree model
+tree_spec <- decision_tree() %>%
+  set_engine("rpart") %>%
+  set_mode("classification")
+
+# start a workflow (recipe only)
+stack_wf <- workflow() %>%
+  add_recipe(stack_recipe)
+
+# add the model and fit the workflow
+stack_tree <- stack_wf %>%
+  add_model(tree_spec) %>%
+  fit(data = stack_train)
+
+# print the fitted model
+stack_tree
+```
+We have trained two ml models.  
+  
+# Confusing matrix  
+  
+A confusion matrix describes how well a classification model (like the ones you just trained!) performs. A confusion matrix tabulates how many examples in each class were correctly classified by a model. In your case, it will show you how many remote developers were classified as remote and how many non-remote developers were classified as non-remote; the confusion matrix also shows you how many were classified into the *wrong* categories.
+
+Here you will use the `conf_mat()` function from yardstick to evaluate the performance of the two models you trained, `stack_glm` and `stack_tree`. The models available in your environment were trained on the training data.  
+  
+-Instructions  
+
+Print the confusion matrix for the `stack_glm` model on the `stack_test` data. If we wanted to compare more than two modeling options, we should definitely create some resampled data sets like we did in the first case study. This case study is already getting long, so let’s stick with the testing data.
+
+Note that the first argument to `conf_mat()` is `truth` and the second is `estimate`.
+```{r}
+results <- stack_test %>%
+  bind_cols(predict(stack_glm, stack_test) %>%
+              rename(.pred_glm = .pred_class))
+
+# Confusion matrix for logistic regression model
+results %>%
+  conf_mat(truth = remote, estimate = .pred_glm)
+```
+  
+- Instructions  
+
+Print the confusion matrix for the `stack_tree` model on the `stack_test` data.
+
+```{r}
+results <- stack_test %>%
+    bind_cols(predict(stack_tree, stack_test) %>%
+                  rename(.pred_tree = .pred_class))
+
+# Confusion matrix for decision tree model
+results %>%
+    conf_mat(truth = remote, estimate = .pred_tree)
+```
+The confusion matrix is used to evaluate the model performance, so we should use the testing set.  
+  
+# Classification model metrics  
+  
+The `conf_mat()` function is helpful but often you also want to store specific performance estimates for later, perhaps in a dataframe-friendly form. The yardstick package is built to handle such needs. For this kind of classification model, you might look at the positive or negative predictive value or perhaps overall accuracy.
+
+The models available in your environment, `stack_glm` and `stack_tree` were trained on the training data.
+
+Instructions
+
+- Predict values for logistic regression (`stack_glm`) and decision tree (`stack_tree`).
+- Calculate both accuracy and positive predictive value for these two models.  
+```{r}
+results <- stack_test %>%
+  bind_cols(predict(stack_glm, stack_test) %>%
+              rename(.pred_glm = .pred_class)) %>%
+  bind_cols(predict(stack_tree, stack_test) %>%
+              rename(.pred_tree = .pred_class))
+
+# Calculate accuracy
+accuracy(results, truth = remote, estimate = .pred_glm)
+accuracy(results, truth = remote, estimate = .pred_tree)
+
+# Caclulate positive predict value
+ppv(results, truth = remote, estimate = .pred_glm)
+ppv(results, truth = remote, estimate = .pred_tree)
+```
+Conclusion:  
+In terms of overall accuracy and positive predictive value, the decision tree model outperforms the logistic regression model. We can predict the remote status of a developer more accurately with a decision tree model.
+
