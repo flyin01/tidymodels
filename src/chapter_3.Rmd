@@ -1,0 +1,64 @@
+---
+title: "chapter_3"
+output: html_notebook
+---
+
+Link: https://supervised-ml-course.netlify.app/chapter3  
+github: https://github.com/juliasilge/supervised-ML-case-studies-course  
+stackoverflow source: https://insights.stackoverflow.com/survey  
+This nb contains code from exercises of Chapter 3.  
+  
+In the third case study, you will use data on attitudes and beliefs in the United States to predict voter turnout. You will apply your skills in dealing with imbalanced data and explore more resampling options.  
+
+The specific question we will address is we are going to use a survey of voters in the United States to predict voter turnout, whether someone did or did not vote, based on their responses on the survey.  
+
+# Predicting voter turnout   
+
+Load the data from github: 
+```{r}
+voters <- read.csv("https://raw.githubusercontent.com/juliasilge/supervised-ML-case-studies-course/master/data/voters.csv")
+```
+
+This data comes from a research collaboration of about two dozen analysts and scholars across the political spectrum in the United States who want to understand what is important to voters and how the views of the electorate in the U.S. are evolving.  
+  
+- Life in America today for people like you compared to fifty years ago is better? about the same? worse?
+- Was your vote primarily a vote in favor of your choice or was it mostly a vote against his/her opponent?
+- How important are the following issues to you?
+-- Crime
+-- Immigration
+-- The environment
+-- Gay rights
+
+Load packages
+```{r}
+library(tidyverse)
+```
+
+
+The data has about 40 variables, or questions on the survey and the variable `turnout16_2016` tells us if that respondnet said they voted in the 2016 election or not.
+```{r}
+glimpse(voters)
+```
+Notice that the answers to the survey questions have been coded as integers. This is actually pretty convenient for modeling, but in a situation like this, you need to look at a data dictionary or guide to understand what the integers mean.
+
+Code 1 : Strongly agree  
+Code 2 : Agree  
+Code 3 : Disagree  
+Code 4 : Strongly disagree  
+  
+```{r}
+voters %>%
+  count(turnout16_2016)
+```
+We are going to build machine learning models to predict whether a respondent voted or not based on their responses to the survey questions. We see that the data is imbalanced.  
+  
+# Choose and appropriate model  
+  
+We want to predict if a person voted or not in the US 2016 presidental election from responses that people gave on the survey. So this is a classification model. We will predict group membership or discrete class labels.  
+  
+# Explore the voter data  
+  
+JATKA TÄSTÄ
+https://supervised-ml-course.netlify.app/chapter3
+
+  
