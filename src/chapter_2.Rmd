@@ -47,6 +47,7 @@ Make a boxplot with remote status on the x-axis and professional experience on t
 stack_overflow %>%
   ggplot(aes(x = remote, y = years_coded_job)) +
   geom_boxplot() +
+  #geom_jitter(alpha = .25, color = "blue") +
   labs(x = NULL,
        y = "Years of professional coding exp")
 ```
@@ -58,8 +59,10 @@ Before we deal with imbalances in the remote/not remote classes, first we split 
   
 Instructions:  
 - Create split of 80/20 sections and about evenly divides the sections between different classes of `remote`. Using `initial_split()`, stratify the split by remote status.  
-- Use `training()`to assign the 80% partiction to `stack_train`and use `testing()` to assign the 20% to `stack_test`.  
+- Use `training()`to assign the 80% partition to `stack_train`and use `testing()` to assign the 20% to `stack_test`.  
 ```{r}
+library(tidymodels)
+
 # factor remote
 stack_overflow$remote <- factor(stack_overflow$remote)
 str(stack_overflow)
@@ -89,7 +92,7 @@ Class imbalance
 stack_train %>%
   count(remote)
 ```
-There are about 10 times more non-remote workers than remote workers. What can happen is that a machine learning model will alwas predict the majority class or otherwise exhibt poor performance on the metrics that we care about.  
+There are about 10 times more non-remote workers than remote workers. What can happen is that a machine learning model will always predict the majority class or otherwise exhibit poor performance on the metrics that we care about.  
   
 There are several ways to deal with this problem, they vary from simple to more complex ways and we will start with a simple option.  
   
