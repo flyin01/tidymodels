@@ -8,7 +8,7 @@ github: https://github.com/juliasilge/supervised-ML-case-studies-course
 stackoverflow source: https://insights.stackoverflow.com/survey  
 This nb contains code from exercises of Chapter 3.  
   
-In the third case study, you will use data on attitudes and beliefs in the United States to predict voter turnout. You will apply your skills in dealing with imbalanced data and explore more resampling options.  
+In the third case study, you will use data on attitudes and beliefs in the United States to predict voter turnout. You will apply your skills in dealing with imbalanced data and explore more re-sampling options.  
 
 The specific question we will address is we are going to use a survey of voters in the United States to predict voter turnout, whether someone did or did not vote, based on their responses on the survey.  
 
@@ -54,11 +54,326 @@ We are going to build machine learning models to predict whether a respondent vo
   
 # Choose and appropriate model  
   
-We want to predict if a person voted or not in the US 2016 presidental election from responses that people gave on the survey. So this is a classification model. We will predict group membership or discrete class labels.  
+We want to predict if a person voted or not in the US 2016 presidential election from responses that people gave on the survey. So this is a classification model. We will predict group membership or discrete class labels.  
   
 # Explore the voter data  
+
+Check out how three responses on the survey vary with voting behaiour by using `group_by()` and `summarise()`.
+```{r}
+voters %>%
+  group_by(turnout16_2016) %>%
+  summarise('Elections dont matter' = mean(RIGGED_SYSTEM_1_2016 <= 2),
+         'Economy is getting better' = mean(econtrend_2016 ==1),
+         'Crime is very important' = mean(imiss_a_2016 ==2))
+```
+We found several responses from this survey that exhibit difference between those who voted and those who did not.
   
-JATKA TÄSTÄ
-https://supervised-ml-course.netlify.app/chapter3
+# Visualize for exploratory data analysis    
+  
+Visualization is a powerful tool for exploratory data analysis. Plotting your data before you start modeling gives you the opportunity to understand its characteristics.  
+  
+Vizualize difference by voter turnout.  
+```{r}
+voters %>%
+  ggplot(aes(x = econtrend_2016, y = after_stat(density)
+             , fill = turnout16_2016)) +
+  geom_histogram(alpha = .5, position = "identity",binwidth = 1) +
+  labs(title = "Overall, is the economy getting better or worse")
+```
+Here, for example, we can see that people who say the economy is getting better are more likely to vote.  
+  
+# Imbalanced data  
+  
+This data from the real world we need to think thgourh important modelling concerns, including how imbalanced the class is that you want to predict. In this case we know that the data set is imbalanced, since there are over 20 times more people in this survey who said they did vote than who said they did not.  
+  
+We are again going to preprocess our training data so we can build a better performing model, but this time we are going to upsample (or oversample) our data.    
+
+# Training and testing data  
+We want to split our data about evenly on the class ´turnout16_2016´.  
+  
+Instructions  
+- Use correct function to create a data split that divides ´voters_select´into 80%/20% sections  
+- Assign the 80% partition to ´vote_train´and the 20% partiton to vote_test
+```{r}
+library(tidymodels)
+```
+
+
+```{r}
+set.seed(1234)
+vote_split <- voters %>%
+  initial_split(p = .8,
+                strata = turnout16_2016)
+
+vote_train <- training(vote_split)
+vote_test <- testing(vote_split)
+
+head(vote_train)
+#glimpse(vote_test)
+```
+We have now created training and testing data sets.
+    
+# VOTE 2016 us and Upsamping
+  
+This is another case study with **imbalanced data**. We are again going to preprocess our training data so we can build a better performing model, but this time we are going to upsample (or oversample) our data.  
+  
+When we implement upsampling, we add more of the people who did not vote (just more of the same ones we already have) until the proportion is equal and the classes are balanced.
+
+We are going to use `step_upsample()` for oversampling because it is simple to implement and understand, but it can lead a classifier to overfit to just a few examples, if you're not lucky. There are other more complex approaches to oversampling available in the themis package as well, but we will focus on random upsampling with replacement here.  
+  
+# Preprocess with a recipe  
+  
+The dataset needs to be prepared for modeling.  
+  
+Instructions  
+- Use a ´recipe()` to preprocess your training data, `vote_train`.
+- Upsample this training data with the function `step_upsample()`.  
+```{r}
+library(themis) # for step_upsample
+```
+  
+  
+```{r}
+vote_recipe <- recipe(turnout16_2016 ~ ., data = vote_train) %>%
+  step_upsample(turnout16_2016)
+
+vote_recipe
+```
+  
+# Create a modelling workflow  
+  
+Now we will test another engine for the random forest model, the ranger package. We will combine the model with our prepocessing steps (the recipe) in a `workflow()` for convenience.  
+  
+Instructions:  
+- Use `rand_forest()` to specify the random forest model. Note that we are using a different engine than in the first case study.  
+- Add the recipe and the model specification to the workflow.  
+```{r}
+vote_recipe <- recipe(turnout16_2016 ~., data = vote_train) %>%
+  step_upsample(turnout16_2016)
+
+# specify a ranger model
+rf_spec <- rand_forest() %>%
+  set_engine("ranger") %>%
+  set_mode("classification")
+
+# add the recipe + model to a workflow
+vote_wf <- workflow() %>%
+  add_recipe(vote_recipe) %>%
+  add_model(rf_spec)
+
+vote_wf
+```
+This is how we combine a recipe and a model into a workflow.  
+  
+# Cross-Validation  
+  
+You have created a training set and testing set and laid out how to deal with class imbalance via upsampling. Now it's time to talk about a new resampling approach. In the first case study, we used bootstrap resampling and talked through what that means. In this chapter, we're going to use cross-validation.  
+  
+Cross-validation means taking your training set and randomly dividing it up evenly into subsets, sometimes called "folds". A fold here means a group or subset or partition.
+
+You use one of the folds for validation and the rest for training, then you repeat these steps with all the subsets and combine the results, usually by taking the mean. The reason we do this is the same reason we would use bootstrap resampling; cross-validation allows you to get a more accurate estimate of how your model will perform on new data.  
+  
+In tidymodels, you can create cross-validation resamples with the function `vfold_cv()`, either with or without the `repeats` argument.  
+  
+Partitioning the data into subsets and using one subset for validation
+```{r}
+#pseudo code, not run
+vfold_cv(vote_train, v = 10)
+vfold_cv(vote_train, v = 10, repeats = 5)
+```
+  
+Let's say we have a sample of lots of people, some of whom voted and some of whom did not, and we want to implement 10-fold cross-validation. This means we divide our training data into 10 groups or folds, and 1 subset or fold acts as our assessment fold (like a mini testing test). We train our model on 9 of the folds and then evaluate the model on the assessment fold.
+
+If we are using preprocessing steps such as upsampling that should only be applied to the 9/10 of the data used for analysis (not the 1/10 of the data used for assessment), the recipes package will automatically take care of that for us.  
+  
+Now we move to the next fold and do this again. We train the model on the rest of the data, the other 9 folds, and evaluate the model on 1/10 of the data, the fold that is currently acting as our assessment fold.  
+  
+We do it again using another of our folds as the assessment fold, training the model on the rest of the data, and we move through all the subsets or folds of the data that we made...  
+  
+... until we do them all, and have trained the model 10 times, on 10 different subsets of the data, with 10 different assessment sets. We then combine all those results together to get one, better estimate of how our model will perform.
+
+This procedure I just described is one round of 10-fold cross-validation. Sometimes practictioners do this more than once, perhaps 5 times. In that case, you repeat the whole process of 10-fold cross-validation 5 times, with 5 different random partitionings into 10 subsets. This is an approach to training models that has demonstrated good performance.  
+  
+However, it can be computationally expensive. ⏳ It does lend itself to parallel processing, since the repeats don't depend on each other, so this is a situation where it likely is worth getting your computer set up to use all the cores you have.  
+
+- Repeated cross-validation can take a long time  
+- Parallel processing can be worth it  
+  
+When you implement 10-fold cross-validation repeated 5 times, you…  
+randomly divide your training data into 10 subsets and train on 9 at a time (assessing on the other subset), iterating through all 10 subsets for assessment. Then you repeat that process 5 times.  
+  
+# Create cross-validation folds  
+  
+We canuse tidymodels to create the kind of cross-validation folds approproriate in this case. We try the 10-fol cross-validation repeated 5 times.  
+  
+Instructions  
+- The arguments `v` specifies the number of folds for cross-validation.  
+- The argument `repeats` specifies the number of repeats.  
+```{r}
+vote_folds <- vfold_cv(vote_train, v = 10, repeats = 5)
+glimpse(vote_folds)
+```
+Evaluating the result object vote_folds took alot of memory and time!  
+  
+# Evaluating the model performance  
+  
+We preprocessed this data, built a modeling workflow, and created cross-validation folds to evaluate model performance. 😎
+
+Let's talk about that model performance now, how to set non-default performance metrics and save predictions from resampled data.  
+  
+Just like in our first case study, we can use the function `fit_resamples()` to fit a model (a workflow in this case, actually, that holds both a preprocessor and a model specification) to each cross-validation fold and compute performance metrics. The code shown on this slide will fit our workflow `vote_wf` to the cross-validation folds in `vote_folds` and determine how well the model performed each time.
+
+The fitted models themselves are not kept or stored because they are only used for computing performance metrics. However, we are saving the predictions with `save_pred = TRUE` so we can build a confusion matrix, and we have also set specific performance metrics to be computed (instead of the defaults) with `metric_set(roc_auc, sens, spec)`. We will have:
+  
+- the area under the ROC curve,
+- sensitivity, and
+- specificity.  
+  
+```{r}
+# presudo code, dont run
+vote_wf %>%
+    fit_resamples(
+        vote_folds,
+        metrics = metric_set(roc_auc, sens, spec),
+        control = control_resamples(save_pred = TRUE)
+    )
+```
+Ran it anyway. This will take some time! We will re-run it once more below.    
+  
+If we start by looking at the metrics for the logistic regression model, you can see that sensitivity and specificity (the true positive and true negative rates) are both around 0.6 or 0.7, which means that most people are being classified into the right categories but we are not getting fantastic results with this model.
+  
+```{r}
+# example coce, not run
+collect_metrics(rf_res)
+```
+When we look at the metrics for the random forest model, we see that the AUC is higher, but sensitivity (the true positive rate, or recall) has dropped to zero! 😱 The random forest model is not able to identify **any** of the people who did not vote.
+
+What we're seeing here is evidence of dramatic overfitting, despite the fact that we used cross-validation. For the amount of data we have available to train this model, the power of a random forest ends up resulting in memorization of the features of the training set, instead of building a useful predictive model. **Our choice to use upsampling** (where the same small number of positive cases were drawn from again and again) **likely made this worse!**
+
+Notice that this is the first time that this has happened in this course. In the first and second case studies we did, the more powerful machine learning algorithm outperformed the simpler model.  
+
+Confusion Matrix    
+```{r}
+# example code, do not run!
+vote_final <- vote_wf %>%
+    last_fit(vote_split)
+
+vote_final %>% 
+    collect_predictions() %>% 
+    conf_mat(turnout16_2016, .pred_class)
+```
+The logistic regression model will likely be the best option, so we can evaluate its performance on the testing data. We can use the `last_fit()` function with a workflow to fit to the entire training set and evaluate on the testing set. You only need to give this function the split object!
+
+We can see that we did a better job identifying the people who voted than those who did not.  
+  
+Now we evaluate these models ourselves!  
+  
+# Resampling two models  
+  
+Let’s use cross-validation resampling to evaluate performance for two kinds of models with this vote data. You’ve already learned how to create resamples, preprocess data for modeling, build a model specification, and combine this in a workflow; now it’s time to put this all together and evaluate this model’s performance.
+
+We are using the full data set so it might take some time! (This means you may see some warnings.)  
+
+Instructions:  
+- Use fit_resamples() to evaluate how this logistic regression model performs on the cross-validation resamples.  
+```{r}
+# We already have the vote_train, vote_folds, vote_recipe objects
+
+glm_spec <- logistic_reg() %>%
+  set_engine("glm")
+
+vote_wf <- workflow() %>%
+  add_recipe(vote_recipe) %>%
+  add_model(glm_spec)
+
+set.seed(234)
+glm_res <- vote_wf %>%
+  fit_resamples(vote_folds,
+                metrics = metric_set(roc_auc, sens, spec),
+                control = control_resamples(save_pred = TRUE)
+  )
+glimpse(glm_res)
+
+```
+  
+Above takes time...  
+
+Instructions:  
+- Now fit resamples `vote_folds` to the random forest model  
+- Compute the metrics `roc_auc`, `sens` and `spec`.  
+```{r}
+vote_wf <- workflow() %>%
+  add_recipe(vote_recipe) %>%
+  add_model(rf_spec)
+
+set.seed(234)
+rf_res <- vote_wf %>%
+  fit_resamples(vote_folds,
+                metrics = metric_set(roc_auc, sens, spec),
+                control = control_resamples(save_pred = TRUE)
+  )
+glimpse(rf_res)
+```
+This one takes even longer time since it is a more advanced ml algorithm and the data set is the full (not 10% only as in the documentation)  
+  
+# Performance metrics from resampling  
+  
+Now we will evaluate these results from resampling.  
+  
+Instructions:  
+- Use the function `collect_metric()`to obtain the metrics we specified from the resampling results.  
+```{r}
+collect_metrics(glm_res)
+collect_metrics(rf_res)
+```
+Notice that the sensitivity for the random forest model is ZERO!  
+  
+# Which model is the best?  
+  
+You have just spent most of this chapter exploring how to predict voter turnout based on survey responses. Of the two types of models you tried, which is the better choice? Which do you expect to perform better on new data?  
+- Random Forest  
+- Logistic Regression - YES!
+  
+ Logistic regression is a simpler model, but in this case, it performed better and you can expect it to do a better job predicting on new data.  
+   
+# Back to the testing data  
+  
+When we used resampling to evaluate model performance with the training set, the logistic regression model performed better. Now, let’s put this model to the test! 😎
+
+Let’s use the `last_fit()` function to fit to the entire training set (OMA: We already used the entire data set) one time and evaluate one time on the testing set, with everything we’ve learned during this case study. Our model has not yet seen the testing data, so this last step is the best way to estimate how well the model will perform when predicting with new data.
+  
+Instructions:  
+- Fit to the training set and evaluate on the testing set using `laast_fit()`
+- Create a confusion matrix for the results from the testing set.  
+```{r}
+# We need to re-run some stuf again that we did above
+
+# preprocess with a recipe
+vote_recipe <- recipe(turnout16_2016 ~ ., data = vote_train) %>%
+  step_upsample(turnout16_2016)
+
+# Model specification - like we did above
+glm_spec <- logistic_reg() %>%
+  set_engine("glm")
+
+# Combine in workflow - like we did above
+vote_wf <- workflow() %>%
+  add_recipe(vote_recipe) %>%
+  add_model(glm_spec)
+
+# Final fit
+vote_final <- vote_wf %>%
+  last_fit(vote_split) # this function is from tune package
+
+# confusion matrix
+vote_final %>%
+  collect_predictions() %>%
+  conf_mat(turnout16_2016, .pred_class)
+```
+Conclusion:  
+We notice there is some difference in how we predict the positive and negative cases.
+
+End of chapter.
+
 
   
