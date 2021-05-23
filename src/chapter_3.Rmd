@@ -372,7 +372,6 @@ vote_final %>%
 ```
 Conclusion:  
 We notice there is some difference in how we predict the positive and negative cases.
-
 End of chapter.
 
 
